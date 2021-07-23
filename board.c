@@ -17,7 +17,8 @@ void zero_board(struct board* board)
 
 void free_board(struct board* board)
 {
-	free(*board->m_arr);
+	if(board->m_arr)
+		free(*board->m_arr);
 	free(board->m_arr);
 }
 
