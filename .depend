@@ -1,4 +1,4 @@
 board.o: board.c board.h
 io.o: io.c io.h
-main.o: main.c board.h printer.h
+main.o: main.c board.h printer.h io.h
 printer.o: printer.c printer.h board.h

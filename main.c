@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
+#include <termios.h>
+#include <unistd.h>
 #include "board.h"
 #include "printer.h"
 #include "io.h"
@@ -216,55 +218,99 @@ void put_random(struct board* board)
 	board->m_arr[i][j] = poss_vals[r];
 }
 
+void init_terminal(struct termios* old_ttystate)
+{
+	tcgetattr(STDIN_FILENO, old_ttystate); //store the old state
+	struct termios ttystate;
+	tcgetattr(STDIN_FILENO, &ttystate);
+	ttystate.c_lflag &= ~ICANON; //disable canonical mode
+	ttystate.c_cc[VMIN] = 1; //react on 1 character
+	ttystate.c_lflag &= ~ECHO;
+	tcsetattr(STDIN_FILENO, TCSANOW, &ttystate);
+}
+
+void restore_terminal(struct termios* ttystate)
+{
+	tcsetattr(STDIN_FILENO, TCSANOW, ttystate);
+}
+
+
+int get_score(const struct board* board)
+{
+	int score = 0;
+	for(int i = 0; i < board->m_rows; ++i)
+		for(int j = 0; j < board->m_cols; ++j)
+			score += board->m_arr[i][j];
+	return score;
+}
+
+
+#define EXIT 0
+#define LOST 1
+#define WON 2
+
+void handle_end(int state, const struct board* board)
+{
+	static const char* strs [] = { "Exited", "You lost :(", "You won!" };
+	puts(strs[state]);
+	printf("Your score: %d\n", get_score(board));
+}
+
+
 int main()
 {
-	nonblock(NB_ENABLE);
+	struct termios ttystate;
+	init_terminal(&ttystate);
 	clear_screen();
-	struct board board;
-	board.m_rows = M;
-	board.m_cols = N;
-	struct board tmp_board;
-	tmp_board.m_rows = board.m_rows;
-	tmp_board.m_cols = board.m_cols;
-	alloc_board(&tmp_board);
-	alloc_board(&board);
-	zero_board(&board);
-	put_random(&board);
-	print_board(&board);
+	struct board board[2];
+	for(int i = 0; i < 2; ++i)
+	{
+		board[i].m_rows = M;
+		board[i].m_cols = N;
+		alloc_board(&board[i]);	
+	}
+	zero_board(&board[0]);
+	put_random(&board[0]);
+	print_board(&board[0]);
 	srand(time(NULL));
 	while(1)
 	{
 		if(kbhit())
 		{
-			clone_board(&board, &tmp_board);
+			clone_board(&board[0], &board[1]);
 			int c = getc(stdin);
 			if(c == 'a')
-				move_left(&board);
+				move_left(&board[0]);
 			else if(c == 'd')
-				move_right(&board);
+				move_right(&board[0]);
 			else if(c == 's')
-				move_down(&board);
+				move_down(&board[0]);
 			else if(c == 'w')
-				move_up(&board);
+				move_up(&board[0]);
 			else if(c == 'x')
-				exit(0);
-			else
-				continue;
-			if(!is_equal_board(&board, &tmp_board))
-				put_random(&board);
-			print_board(&board);
-			if(islost(&board))
 			{
-				printf("You lost :(\n");
+				handle_end(EXIT,&board[0]);
 				break;
 			}
-			if(iswon(&board))
+			else
+				continue;
+			if(!is_equal_board(&board[0], &board[1]))
+				put_random(&board[0]);
+			print_board(&board[0]);
+			if(islost(&board[0]))
 			{
-				printf("You won!\n");
+				handle_end(LOST, &board[0]);
+				break;
+			}
+			if(iswon(&board[0]))
+			{
+				handle_end(WON, &board[0]);
 				break;
 			}
 		}
 	}
-	free_board(&board);
-	free_board(&tmp_board);
+	for(int i = 0; i < 2; ++i)
+		free_board(&board[i]);
+	restore_terminal(&ttystate);
+	return 0;
 }
