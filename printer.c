@@ -21,7 +21,7 @@ struct rgb
 #define DARK_PURPLE {70,8,94}
 #define REDRANGE {235,87,38}
 
-struct rgb colors[12] = {
+struct rgb colors[] = {
 		LIGHT_BLUE,
 		DARK_BLUE,
 		BROWN,
@@ -61,10 +61,12 @@ void print_middle(const struct board* board, int i, int is_num)
 	for(int j = 0; j < board->m_cols; ++j)
 	{
 		int x = board->m_arr[i][j];
-		int idx = __builtin_popcount(x - 1) - 1;
 		if(x != 0)
+		{
+			int idx = __builtin_popcount(x - 1) - 1;
 			printf("\033[48;2;%d;%d;%dm", colors[idx].r, colors[idx].g, colors[idx].b);
-		if(is_num && x) //don't print zeroes
+		}
+		if(x && is_num) //don't print zeroes
 			printf("%4d", x);
 		else
 			printf("    ");
