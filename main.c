@@ -11,7 +11,8 @@
 #define DEFAULT_ROWS 4
 #define DEFAULT_COLS 4
 #define DEFAULT_TARGET 2048
-
+#define DEFAULT_RANGE 2
+#define DEFAULT_NUMGEN 1
 int generate_rand_idx(const struct board* board, int* row_idx, int* col_idx)
 {
 	int cnt = 0;
@@ -220,14 +221,16 @@ int iswon(const struct board* board, int target)
 	return 0;
 }
 
-void put_random(struct board* board)
+void put_random(struct board* board, int range, int numgen)
 {
-	int i, j;
-	if(!generate_rand_idx(board, &i, &j))
-		return;
-	int poss_vals[] = {2, 4};
-	int r = rand() % (sizeof(poss_vals) / sizeof(*poss_vals));
-	board->m_arr[i][j] = poss_vals[r];
+	for(int n = 0; n < numgen; ++n)
+	{
+		int i, j;
+		if(!generate_rand_idx(board, &i, &j))
+			return;
+		int r = 1 + rand() % range;
+		board->m_arr[i][j] = 1 << r;
+	}
 }
 
 void init_terminal(struct termios* old_ttystate)
@@ -268,7 +271,15 @@ void handle_end(int state, const struct board* board)
 	printf("Your score: %d\n", get_score(board));
 }
 
-void game(int rows, int cols, int target)
+/**
+ * @brief
+ * @param rows - number of rows
+ * @param cols - number of columns
+ * @param target - targenumber which, if present, the game is won
+ * @param range - number range to be generated, the following will be generated: 2^1, 2^2, ... 2^range
+ * @param numgen - number of new tiles to be generated
+ */
+void game(int rows, int cols, int target, int range, int numgen)
 {
 	struct board main_board;
 	struct board tmp_board;
@@ -277,7 +288,7 @@ void game(int rows, int cols, int target)
 	alloc_board(&main_board);
 	alloc_board(&tmp_board);
 	zero_board(&main_board);
-	put_random(&main_board);
+	put_random(&main_board, range, numgen);
 	print_board(&main_board);
 	while(1)
 		if(kbhit())
@@ -305,7 +316,7 @@ void game(int rows, int cols, int target)
 			}
 			if(m == 1)
 			{
-				put_random(&main_board);
+				put_random(&main_board, range, numgen);
 				print_board(&main_board);
 			}
 			if(islost(&main_board))
@@ -328,7 +339,10 @@ void usage()
 		   "|Options|\n"
 		   "+-------+\n"  "-r <num> ... set the number of rows (default = 4)\n"
 		   "-c <num> ... set the number of columns (default = 4)\n"
-		   "-t <num> ... set the target number (default = 2048)\n"
+		   "-t <num> ... set the target number (default = 2048, max = 8192)\n"
+		   "-a <num> ... set the range of numbers to be generated (default = 2)\n"
+		   "         ... if range=r, then numbers 2^1, 2^2, ..., 2^r will be generated\n"
+		   "-g <num> ... set number of new tiles to be generated with each move (default = 1)"
 		   "-h ... show this help message and exit\n"
 		   "+-----------+\n"
 		   "|How to play|\n"
@@ -338,10 +352,10 @@ void usage()
 }
 
 
-int parse_args(int argc, char* argv[], int* rows, int* cols, int* target)
+int parse_args(int argc, char* argv[], int* rows, int* cols, int* target, int* range, int* numgen)
 {
 	int c;
-	while((c = getopt(argc, argv, "hr:c:t:")) != -1)
+	while((c = getopt(argc, argv, "hr:c:t:a:g:")) != -1)
 		switch(c)
 		{
 			case 'r':
@@ -359,9 +373,23 @@ int parse_args(int argc, char* argv[], int* rows, int* cols, int* target)
 				}
 				break;
 			case 't':
-				if(!sscanf(optarg, "%d", target) || __builtin_popcount(*target) != 1)
+				if(!sscanf(optarg, "%d", target) || __builtin_popcount(*target) != 1 || *target > 9999)
 				{
-					fprintf(stderr, "Invalid argument to -t option, expected positive number which is a power of 2\n");
+					fprintf(stderr, "Invalid argument to -t option, expected positive number which is a power of 2 and less than 10000\n");
+					return 0;
+				}
+				break;
+			case 'a':
+				if(!sscanf(optarg, "%d", range) || (*range) < 1 || (*range) > 13)
+				{
+					fprintf(stderr, "Invalid argument to -a option, expected positive number between 1 and 13 (inclusive)\n");
+					return 0;
+				}
+				break;
+			case 'g':
+				if(!sscanf(optarg, "%d", numgen) || (*numgen) < 1)
+				{
+					fprintf(stderr, "Invalid argument to -g option, expected positive number greater than 0\n");
 					return 0;
 				}
 				break;
@@ -381,13 +409,15 @@ int main(int argc, char* argv[])
 	int rows = DEFAULT_ROWS;
 	int cols = DEFAULT_COLS;
 	int target = DEFAULT_TARGET;
-	if(!parse_args(argc, argv, &rows, &cols, &target))
+	int range = DEFAULT_RANGE;
+	int numgen = DEFAULT_NUMGEN;
+	if(!parse_args(argc, argv, &rows, &cols, &target, &range, &numgen))
 		return 1;
 	struct termios ttystate;
 	init_terminal(&ttystate);
 	srand(time(NULL));
 	clear_screen();
-	game(rows, cols, target);
+	game(rows, cols, target, range, numgen);
 	restore_terminal(&ttystate);
 	return 0;
 }

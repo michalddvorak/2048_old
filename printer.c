@@ -35,6 +35,14 @@ struct rgb colors[] = {
 		ORANGE
 };
 
+void get_color(int idx, struct rgb* color)
+{
+	if(idx < sizeof(colors) / sizeof(*colors))
+		*color = colors[idx];
+	else
+		*color = (struct rgb){0, 0, 0};
+}
+
 
 void clear_screen()
 {
@@ -46,34 +54,35 @@ void move_cursor(int i, int j)
 	printf("\033[%d;%dH", i, j);
 }
 
-void print_corner(int n)
-{
-	printf("+");
-	for(int j = 0; j < n; ++j)
-		printf("----+");
-	printf("\n");
-}
-
-
 void print_middle(const struct board* board, int i, int is_num)
 {
 	printf("|");
 	for(int j = 0; j < board->m_cols; ++j)
 	{
 		int x = board->m_arr[i][j];
-		if(x != 0)
+		if(x)
 		{
-			int idx = __builtin_popcount(x - 1) - 1;
-			printf("\033[48;2;%d;%d;%dm", colors[idx].r, colors[idx].g, colors[idx].b);
+			struct rgb color;
+			get_color(__builtin_popcount(x - 1) - 1, &color);
+			printf("\033[48;2;%d;%d;%dm", color.r, color.g, color.b);
 		}
-		if(x && is_num) //don't print zeroes
+		if(x && is_num)
 			printf("%4d", x);
 		else
 			printf("    ");
-		if(x != 0)
+		if(x)
 			printf("\033[0m");
 		printf("|");
 	}
+	printf("\n");
+}
+
+
+void print_corner(int cols)
+{
+	printf("+");
+	for(int j = 0; j < cols; ++j)
+		printf("----+");
 	printf("\n");
 }
 
@@ -83,9 +92,12 @@ void print_board(const struct board* board)
 	print_corner(board->m_cols);
 	for(int i = 0; i < board->m_rows; ++i)
 	{
-		print_middle(board, i, 0);
-		print_middle(board, i, 1);
-		print_middle(board, i, 0);
+		for(int m = 0; m < 3; ++m)
+			print_middle(board, i, m == 1);
 		print_corner(board->m_cols);
 	}
 }
+
+
+
+
