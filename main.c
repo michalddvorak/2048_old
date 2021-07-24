@@ -159,7 +159,6 @@ void move_up(struct board* board)
 		calc_column(board, j, 1);
 }
 
-
 int islost(const struct board* board)
 {
 	struct board tmp_board;
@@ -256,61 +255,77 @@ void handle_end(int state, const struct board* board)
 	printf("Your score: %d\n", get_score(board));
 }
 
+//0 - should exit
+//1 - should not exit
+int handle_input(int c, struct board* main_board, struct board* tmp_board)
+{
+	clone_board(main_board, tmp_board);
+	switch(c)
+	{
+		case 'a':
+			move_left(main_board);
+			break;
+		case 'd':
+			move_right(main_board);
+			break;
+		case 's':
+			move_down(main_board);
+			break;
+		case 'w':
+			move_up(main_board);
+			break;
+		case 'x':
+			handle_end(EXIT, main_board);
+			return 1;	
+		default:
+			return 0;
+	}
+	if(!is_equal_board(main_board,tmp_board))
+		put_random(main_board);
+	print_board(main_board);
+	if(islost(main_board))
+	{
+		handle_end(LOST, main_board);
+		return 0;
+	}
+	if(iswon(main_board))
+	{
+		handle_end(WON, main_board);
+		return 0;
+	}
+	return 1;
+
+}
+
+void game()
+{
+	struct board main_board;
+	struct board tmp_board;
+	main_board.m_rows = tmp_board.m_rows = M;
+	main_board.m_cols = tmp_board.m_cols = N;
+	alloc_board(&main_board);
+	alloc_board(&tmp_board);
+	zero_board(&main_board);
+	put_random(&main_board);
+	print_board(&main_board);
+	while(1)
+		if(kbhit())
+			if(!handle_input(getc(stdin), &main_board, &tmp_board))
+				break;
+}
+
+
+
+
+
 
 int main()
 {
 	struct termios ttystate;
 	init_terminal(&ttystate);
-	clear_screen();
-	struct board board[2];
-	for(int i = 0; i < 2; ++i)
-	{
-		board[i].m_rows = M;
-		board[i].m_cols = N;
-		alloc_board(&board[i]);	
-	}
-	zero_board(&board[0]);
-	put_random(&board[0]);
-	print_board(&board[0]);
 	srand(time(NULL));
-	while(1)
-	{
-		if(kbhit())
-		{
-			clone_board(&board[0], &board[1]);
-			int c = getc(stdin);
-			if(c == 'a')
-				move_left(&board[0]);
-			else if(c == 'd')
-				move_right(&board[0]);
-			else if(c == 's')
-				move_down(&board[0]);
-			else if(c == 'w')
-				move_up(&board[0]);
-			else if(c == 'x')
-			{
-				handle_end(EXIT,&board[0]);
-				break;
-			}
-			else
-				continue;
-			if(!is_equal_board(&board[0], &board[1]))
-				put_random(&board[0]);
-			print_board(&board[0]);
-			if(islost(&board[0]))
-			{
-				handle_end(LOST, &board[0]);
-				break;
-			}
-			if(iswon(&board[0]))
-			{
-				handle_end(WON, &board[0]);
-				break;
-			}
-		}
-	}
-	for(int i = 0; i < 2; ++i)
-		free_board(&board[i]);
+	clear_screen();
+	game();
 	restore_terminal(&ttystate);
 	return 0;
 }
