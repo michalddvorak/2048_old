@@ -8,9 +8,9 @@
 #include "printer.h"
 #include "io.h"
 
-#define M 4
-#define N 4
-
+#define DEFAULT_ROWS 4
+#define DEFAULT_COLS 4
+#define DEFAULT_TARGET 2048
 
 int generate_rand_idx(const struct board* board, int* row_idx, int* col_idx)
 {
@@ -42,15 +42,16 @@ int bcheck(const struct board* board, int idx, int dir, int rc)
 {
 	if(dir == 1)
 	{
+		//Note that when iterating over rows, the boundary is the number of columns and vice versa
 		if(rc == ROW)
-			return idx < board->m_rows;
-		else //rc == COL
 			return idx < board->m_cols;
+		else //rc == COL
+			return idx < board->m_rows;
 	}
 	else //dir == -1
 		return idx >= 0;
 }
-void calc_line(struct board* board, int i, int dir)
+int calc_line(struct board* board, int i, int dir)
 {
 	int nline[board->m_cols];
 	memset(nline, 0, sizeof(nline));
@@ -88,12 +89,16 @@ void calc_line(struct board* board, int i, int dir)
 			nlineidx += dir;
 		}
 	}
-	
+	int res = 0;
 	for(j = 0; j < board->m_cols; ++j)
+	{
+		res = res || board->m_arr[i][j] != nline[j];
 		board->m_arr[i][j] = nline[j];
+	}
+	return res;
 }
 
-void calc_column(struct board* board, int j, int dir)
+int calc_column(struct board* board, int j, int dir)
 {
 	int ncolumn[board->m_rows];
 	memset(ncolumn, 0, sizeof(ncolumn));
@@ -131,76 +136,86 @@ void calc_column(struct board* board, int j, int dir)
 			ncolumnidx += dir;
 		}
 	}
-	for(i = 0; i < M; ++i)
+	int res = 0;
+	for(i = 0; i < board->m_rows; ++i)
+	{
+		res = res || board->m_arr[i][j] != ncolumn[i];
 		board->m_arr[i][j] = ncolumn[i];
+	}
+	return res;
 }
 
-void move_left(struct board* board)
+int move_left(struct board* board)
 {
+	int res = 0;
 	for(int i = 0; i < board->m_rows; ++i)
-		calc_line(board, i, 1);
+		res = calc_line(board, i, 1) || res;
+	return res;
 }
 
-void move_right(struct board* board)
+int move_right(struct board* board)
 {
+	int res = 0;
 	for(int i = 0; i < board->m_rows; ++i)
-		calc_line(board, i, -1);
+		res = calc_line(board, i, -1) || res;
+	return res;
 }
 
-void move_down(struct board* board)
+int move_down(struct board* board)
 {
+	int res = 0;
 	for(int j = 0; j < board->m_cols; ++j)
-		calc_column(board, j, -1);
+		res = calc_column(board, j, -1) || res;
+	return res;
 }
 
-void move_up(struct board* board)
+int move_up(struct board* board)
 {
+	int res = 0;
 	for(int j = 0; j < board->m_cols; ++j)
-		calc_column(board, j, 1);
+		res = calc_column(board, j, 1) || res;
+	return res;
+}
+
+#define LEFT 0
+#define RIGHT 1
+#define UP 2
+#define DOWN 3
+
+//returns true if board changed
+int move(int dir, struct board* main_board, struct board* tmp_board)
+{
+	static int (* moves[4])(struct board*) = {move_left, move_right, move_up, move_down};
+	return moves[dir](main_board);
 }
 
 int islost(const struct board* board)
 {
-	struct board tmp_board;
-	tmp_board.m_rows = board->m_rows;
-	tmp_board.m_cols = board->m_cols;
-	alloc_board(&tmp_board);
-	clone_board(board, &tmp_board);
-	int ret = 1;
-	move_left(&tmp_board);
-	if(!is_equal_board(&tmp_board, board))
-	{
-		ret = 0;
-		goto ret;
-	}
-	move_right(&tmp_board);
-	if(!is_equal_board(&tmp_board, board))
-	{
-		ret = 0;
-		goto ret;
-	}
-	move_down(&tmp_board);
-	if(!is_equal_board(&tmp_board, board))
-	{
-		ret = 0;
-		goto ret;
-	}
-	move_up(&tmp_board);
-	if(!is_equal_board(&tmp_board, board))
-	{
-		ret = 0;
-		goto ret;
-	}
-ret:
-	free_board(&tmp_board);
-	return ret;
+	//The game is lost if and only if there is no space (all nonzero)
+	//and across all columns and rows there are no two adjacent same numbers
+	
+	for(int i = 0; i < board->m_rows; ++i)
+		for(int j = 0; j < board->m_cols; ++j)
+			if(board->m_arr[i][j] == 0)
+				return 0;
+	
+	for(int i = 0; i < board->m_rows; ++i)
+		for(int j = 0; j < board->m_cols - 1; ++j)
+			if(board->m_arr[i][j] == board->m_arr[i][j + 1])
+				return 0;
+	
+	for(int j = 0; j < board->m_cols; ++j)
+		for(int i = 0; i < board->m_rows - 1; ++i)
+			if(board->m_arr[i][j] == board->m_arr[i + 1][j])
+				return 0;
+	return 1;
 }
 
-int iswon(const struct board* board)
+int iswon(const struct board* board, int target)
 {
 	for(int i = 0; i < board->m_rows; ++i)
 		for(int j = 0; j < board->m_cols; ++j)
-			if(board->m_arr[i][j] == 2048)
+			if(board->m_arr[i][j] == target)
 				return 1;
 	return 0;
 }
@@ -210,9 +225,7 @@ void put_random(struct board* board)
 	int i, j;
 	if(!generate_rand_idx(board, &i, &j))
 		return;
-	
 	int poss_vals[] = {2, 4};
-	
 	int r = rand() % (sizeof(poss_vals) / sizeof(*poss_vals));
 	board->m_arr[i][j] = poss_vals[r];
 }
@@ -250,59 +263,17 @@ int get_score(const struct board* board)
 
 void handle_end(int state, const struct board* board)
 {
-	static const char* strs [] = { "Exited", "You lost :(", "You won!" };
+	static const char* strs[] = {"Exited", "You lost :(", "You won!"};
 	puts(strs[state]);
 	printf("Your score: %d\n", get_score(board));
 }
 
-//0 - should exit
-//1 - should not exit
-int handle_input(int c, struct board* main_board, struct board* tmp_board)
-{
-	clone_board(main_board, tmp_board);
-	switch(c)
-	{
-		case 'a':
-			move_left(main_board);
-			break;
-		case 'd':
-			move_right(main_board);
-			break;
-		case 's':
-			move_down(main_board);
-			break;
-		case 'w':
-			move_up(main_board);
-			break;
-		case 'x':
-			handle_end(EXIT, main_board);
-			return 1;	
-		default:
-			return 0;
-	}
-	if(!is_equal_board(main_board,tmp_board))
-		put_random(main_board);
-	print_board(main_board);
-	if(islost(main_board))
-	{
-		handle_end(LOST, main_board);
-		return 0;
-	}
-	if(iswon(main_board))
-	{
-		handle_end(WON, main_board);
-		return 0;
-	}
-	return 1;
-
-}
-
-void game()
+void game(int rows, int cols, int target)
 {
 	struct board main_board;
 	struct board tmp_board;
-	main_board.m_rows = tmp_board.m_rows = M;
-	main_board.m_cols = tmp_board.m_cols = N;
+	main_board.m_rows = tmp_board.m_rows = rows;
+	main_board.m_cols = tmp_board.m_cols = cols;
 	alloc_board(&main_board);
 	alloc_board(&tmp_board);
 	zero_board(&main_board);
@@ -310,22 +281,113 @@ void game()
 	print_board(&main_board);
 	while(1)
 		if(kbhit())
-			if(!handle_input(getc(stdin), &main_board, &tmp_board))
-				break;
+		{
+			int m = -1; //move
+			switch(getc(stdin))
+			{
+				case 'a':
+					m = move(LEFT, &main_board, &tmp_board);
+					break;
+				case 'd':
+					m = move(RIGHT, &main_board, &tmp_board);
+					break;
+				case 's':
+					m = move(DOWN, &main_board, &tmp_board);
+					break;
+				case 'w':
+					m = move(UP, &main_board, &tmp_board);
+					break;
+				case 'x':
+					handle_end(EXIT, &main_board);
+					return;
+				default:
+					continue;
+			}
+			if(m == 1)
+			{
+				put_random(&main_board);
+				print_board(&main_board);
+			}
+			if(islost(&main_board))
+			{
+				handle_end(LOST, &main_board);
+				return;
+			}
+			if(iswon(&main_board, target))
+			{
+				handle_end(WON, &main_board);
+				return;
+			}
+		}
+}
+
+void usage()
+{
+	printf("2048 game\n"
+		   "+-------+\n"
+		   "|Options|\n"
+		   "+-------+\n"  "-r <num> ... set the number of rows (default = 4)\n"
+		   "-c <num> ... set the number of columns (default = 4)\n"
+		   "-t <num> ... set the target number (default = 2048)\n"
+		   "-h ... show this help message and exit\n"
+		   "+-----------+\n"
+		   "|How to play|\n"
+		   "+-----------+\n"
+		   "w,a,s,d ... movement (up, left, down, right, respectively)\n"
+		   "x ... exit\n");
 }
 
 
-
-
-
-
-int main()
+int parse_args(int argc, char* argv[], int* rows, int* cols, int* target)
 {
+	int c;
+	while((c = getopt(argc, argv, "hr:c:t:")) != -1)
+		switch(c)
+		{
+			case 'r':
+				if(!sscanf(optarg, "%d", rows) || *rows <= 0)
+				{
+					fprintf(stderr, "Invalid argument to -r option, expected positive number\n");
+					return 0;
+				}
+				break;
+			case 'c':
+				if(!sscanf(optarg, "%d", cols) || *cols <= 0)
+				{
+					fprintf(stderr, "Invalid argument to -c option, expected positive number\n");
+					return 0;
+				}
+				break;
+			case 't':
+				if(!sscanf(optarg, "%d", target) || __builtin_popcount(*target) != 1)
+				{
+					fprintf(stderr, "Invalid argument to -t option, expected positive number which is a power of 2\n");
+					return 0;
+				}
+				break;
+			case 'h':
+				usage();
+				exit(0);
+			case '?':
+				return 0;
+			default:
+				abort();
+		}
+	return 1;
+}
+
+int main(int argc, char* argv[])
+{
+	int rows = DEFAULT_ROWS;
+	int cols = DEFAULT_COLS;
+	int target = DEFAULT_TARGET;
+	if(!parse_args(argc, argv, &rows, &cols, &target))
+		return 1;
 	struct termios ttystate;
 	init_terminal(&ttystate);
 	srand(time(NULL));
 	clear_screen();
-	game();
+	game(rows, cols, target);
 	restore_terminal(&ttystate);
 	return 0;
 }
