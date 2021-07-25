@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <termios.h>
 #include <unistd.h>
+#include <getopt.h>
+#include <termios.h>
 #include "game.h"
 
 #define DEFAULT_ROWS 4
