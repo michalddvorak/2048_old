@@ -7,6 +7,7 @@
 #include "printer.h"
 #include "io.h"
 
+
 int generate_rand_idx(const struct board* board, int* row_idx, int* col_idx)
 {
 	int cnt = 0;
@@ -38,7 +39,7 @@ int bound_check(const struct board* board, int idx, int dir, int rc)
 {
 	if(dir == 1)
 	{
-		//Note that when iterating over rows, the boundary is the number of columns and vice versa
+		//when iterating over rows, the boundary is the number of columns and vice versa
 		if(rc == ROW)
 			return idx < board->m_cols;
 		else //rc == COL
@@ -48,15 +49,19 @@ int bound_check(const struct board* board, int idx, int dir, int rc)
 		return idx >= 0;
 }
 
-int calc_line(struct board* board, int i, int dir)
+//dir = 1   ->
+//dir = -1  <-
+int update_line(struct board* board, int i, int dir)
 {
-	int nline[board->m_cols];
-	memset(nline, 0, sizeof(nline));
-	int nlineidx, j;
-	if(dir == 1)
-		nlineidx = j = 0;
-	else
-		nlineidx = j = board->m_cols - 1;
+	int new_line[board->m_cols];
+	memset(new_line, 0, sizeof(new_line));
+	int new_line_idx;
+	int j;
+#define APPEND(x) new_line[new_line_idx] = x, new_line_idx += dir
+	
+	//This initializes the index to 0 if direction is ->
+	//and to board->m_cols - 1 otherwise (direction is <-)
+	new_line_idx = j = (dir == -1) * (board->m_cols - 1);
 	
 	while(1)
 	{
@@ -70,40 +75,38 @@ int calc_line(struct board* board, int i, int dir)
 			j += dir;
 		if(!bound_check(board, j, dir, ROW))
 		{
-			nline[nlineidx] = cur;
+			new_line[new_line_idx] = cur;
 			break;
 		}
 		int next = board->m_arr[i][j];
 		if(cur == next)
 		{
-			nline[nlineidx] = cur + next;
-			nlineidx += dir;
+			APPEND(cur + next);
 			j += dir;
 		}
 		else
-		{
-			nline[nlineidx] = cur;
-			nlineidx += dir;
-		}
+			APPEND(cur);
 	}
+#undef APPEND
 	int res = 0;
 	for(j = 0; j < board->m_cols; ++j)
 	{
-		res = res || board->m_arr[i][j] != nline[j];
-		board->m_arr[i][j] = nline[j];
+		res = res || board->m_arr[i][j] != new_line[j];
+		board->m_arr[i][j] = new_line[j];
 	}
 	return res;
 }
 
-int calc_column(struct board* board, int j, int dir)
+//TODO: maybe this entire calculation can be done inplace?
+int update_column(struct board* board, int j, int dir)
 {
-	int ncolumn[board->m_rows];
-	memset(ncolumn, 0, sizeof(ncolumn));
-	int ncolumnidx, i;
-	if(dir == 1)
-		ncolumnidx = i = 0;
-	else
-		ncolumnidx = i = board->m_rows - 1;
+	int new_column[board->m_rows];
+	memset(new_column, 0, sizeof(new_column));
+	int new_column_idx;
+	int i;
+#define APPEND(x) new_column[new_column_idx] = x, new_column_idx += dir
+	
+	new_column_idx = i = (dir == -1) * (board->m_rows - 1);
 	
 	while(1)
 	{
@@ -117,27 +120,24 @@ int calc_column(struct board* board, int j, int dir)
 			i += dir;
 		if(!bound_check(board, i, dir, COL))
 		{
-			ncolumn[ncolumnidx] = cur;
+			new_column[new_column_idx] = cur;
 			break;
 		}
 		int next = board->m_arr[i][j];
 		if(cur == next)
 		{
-			ncolumn[ncolumnidx] = cur + next;
-			ncolumnidx += dir;
+			APPEND(cur + next);
 			i += dir;
 		}
 		else
-		{
-			ncolumn[ncolumnidx] = cur;
-			ncolumnidx += dir;
-		}
+			APPEND(cur);
 	}
+#undef APPEND
 	int res = 0;
 	for(i = 0; i < board->m_rows; ++i)
 	{
-		res = res || board->m_arr[i][j] != ncolumn[i];
-		board->m_arr[i][j] = ncolumn[i];
+		res = res || board->m_arr[i][j] != new_column[i];
+		board->m_arr[i][j] = new_column[i];
 	}
 	return res;
 }
@@ -146,7 +146,7 @@ int move_left(struct board* board)
 {
 	int res = 0;
 	for(int i = 0; i < board->m_rows; ++i)
-		res = calc_line(board, i, 1) || res;
+		res = update_line(board, i, 1) || res;
 	return res;
 }
 
@@ -154,7 +154,7 @@ int move_right(struct board* board)
 {
 	int res = 0;
 	for(int i = 0; i < board->m_rows; ++i)
-		res = calc_line(board, i, -1) || res;
+		res = update_line(board, i, -1) || res;
 	return res;
 }
 
@@ -162,7 +162,7 @@ int move_down(struct board* board)
 {
 	int res = 0;
 	for(int j = 0; j < board->m_cols; ++j)
-		res = calc_column(board, j, -1) || res;
+		res = update_column(board, j, -1) || res;
 	return res;
 }
 
@@ -170,19 +170,8 @@ int move_up(struct board* board)
 {
 	int res = 0;
 	for(int j = 0; j < board->m_cols; ++j)
-		res = calc_column(board, j, 1) || res;
+		res = update_column(board, j, 1) || res;
 	return res;
-}
-
-#define LEFT 0
-#define RIGHT 1
-#define UP 2
-#define DOWN 3
-
-int move(int dir, struct board* main_board)
-{
-	static int (* moves[4])(struct board*) = {move_left, move_right, move_up, move_down};
-	return moves[dir](main_board);
 }
 
 int islost(const struct board* board)
@@ -268,16 +257,16 @@ void game(int rows, int cols, int target, int range, int numgen)
 			switch(getc(stdin))
 			{
 				case 'a':
-					m = move(LEFT, &main_board);
+					m = move_left(&main_board);
 					break;
 				case 'd':
-					m = move(RIGHT, &main_board);
+					m = move_right(&main_board);
 					break;
 				case 's':
-					m = move(DOWN, &main_board);
+					m = move_down(&main_board);
 					break;
 				case 'w':
-					m = move(UP, &main_board);
+					m = move_up(&main_board);
 					break;
 				case 'x':
 					handle_end(EXIT, &main_board);

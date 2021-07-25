@@ -18,7 +18,7 @@ void init_terminal(struct termios* old_ttystate)
 	tcgetattr(STDIN_FILENO, &ttystate);
 	ttystate.c_lflag &= ~ICANON; //disable canonical mode
 	ttystate.c_cc[VMIN] = 1; //react on 1 character
-	ttystate.c_lflag &= ~ECHO;
+	ttystate.c_lflag &= ~ECHO; //don't echo characters pressed
 	tcsetattr(STDIN_FILENO, TCSANOW, &ttystate);
 }
 
