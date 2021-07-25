@@ -3,10 +3,10 @@ CCFLAGS     =  -Wall -pedantic -g
 PROG        = 2048
 
 
-OBJS        = io.o \
-			  printer.o \
-			  board.o
-
+OBJS        = 	io.o \
+			  	printer.o \
+				board.o \
+				game.o
 
 
 
