@@ -9,14 +9,10 @@ OBJS        = 	io.o \
 				game.o
 
 
-
 all : $(PROG)
 
 $(PROG) : main.c $(OBJS)
 	$(CC) $(CCFLAGS) -o $(PROG) main.c $(OBJS)
-
-%.o : %.c
-	$(CC) $(CCFLAGS) -c $< -o $@
 
 depend:
 	$(CC) *.c -MM > .depend
