@@ -53,16 +53,10 @@ int bound_check(const struct board* board, int idx, int dir, int rc)
 //dir = -1  <-
 int update_line(struct board* board, int i, int dir)
 {
-	int new_line[board->m_cols];
-	memset(new_line, 0, sizeof(new_line));
-	int new_line_idx;
-	int j;
-#define APPEND(x) new_line[new_line_idx] = x, new_line_idx += dir
-	
-	//This initializes the index to 0 if direction is ->
-	//and to board->m_cols - 1 otherwise (direction is <-)
-	new_line_idx = j = (dir == -1) * (board->m_cols - 1);
-	
+	int new_j, j;
+	new_j = j = (dir == -1) * (board->m_cols - 1);
+	int has_changed = 0;
+#define APPEND(x) has_changed = has_changed || board->m_arr[i][new_j] != x, board->m_arr[i][new_j] = x, new_j += dir
 	while(1)
 	{
 		while(bound_check(board, j, dir, ROW) && board->m_arr[i][j] == 0)
@@ -75,7 +69,7 @@ int update_line(struct board* board, int i, int dir)
 			j += dir;
 		if(!bound_check(board, j, dir, ROW))
 		{
-			new_line[new_line_idx] = cur;
+			APPEND(cur);
 			break;
 		}
 		int next = board->m_arr[i][j];
@@ -87,26 +81,19 @@ int update_line(struct board* board, int i, int dir)
 		else
 			APPEND(cur);
 	}
+	while(bound_check(board, new_j, dir, ROW))
+		APPEND(0);
+	return has_changed;
 #undef APPEND
-	int res = 0;
-	for(j = 0; j < board->m_cols; ++j)
-	{
-		res = res || board->m_arr[i][j] != new_line[j];
-		board->m_arr[i][j] = new_line[j];
-	}
-	return res;
 }
 
-//TODO: maybe this entire calculation can be done inplace?
 int update_column(struct board* board, int j, int dir)
 {
-	int new_column[board->m_rows];
-	memset(new_column, 0, sizeof(new_column));
-	int new_column_idx;
-	int i;
-#define APPEND(x) new_column[new_column_idx] = x, new_column_idx += dir
-	
-	new_column_idx = i = (dir == -1) * (board->m_rows - 1);
+	int new_i, i;
+	new_i = i = (dir == -1) * (board->m_rows - 1);
+	int has_changed = 0;
+
+#define APPEND(x) has_changed = has_changed || board->m_arr[new_i][j] != x, board->m_arr[new_i][j] = x, new_i += dir
 	
 	while(1)
 	{
@@ -120,7 +107,7 @@ int update_column(struct board* board, int j, int dir)
 			i += dir;
 		if(!bound_check(board, i, dir, COL))
 		{
-			new_column[new_column_idx] = cur;
+			APPEND(cur);
 			break;
 		}
 		int next = board->m_arr[i][j];
@@ -132,14 +119,10 @@ int update_column(struct board* board, int j, int dir)
 		else
 			APPEND(cur);
 	}
+	while(bound_check(board, new_i, dir, COL))
+		APPEND(0);
+	return has_changed;
 #undef APPEND
-	int res = 0;
-	for(i = 0; i < board->m_rows; ++i)
-	{
-		res = res || board->m_arr[i][j] != new_column[i];
-		board->m_arr[i][j] = new_column[i];
-	}
-	return res;
 }
 
 int move_left(struct board* board)
