@@ -38,7 +38,7 @@ void usage()
 		   "-t <num> ... set the target number (default = 2048, max = 8192)\n"
 		   "-a <num> ... set the range of numbers to be generated (default = 2)\n"
 		   "         ... if range=r, then numbers 2^1, 2^2, ..., 2^r will be generated\n"
-		   "-g <num> ... set number of new tiles to be generated with each move (default = 1)"
+		   "-g <num> ... set number of new tiles to be generated with each move (default = 1)\n"
 		   "-h ... show this help message and exit\n"
 		   "+-----------+\n"
 		   "|How to play|\n"
